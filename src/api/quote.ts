@@ -57,6 +57,8 @@ export default async function quoteHandler(req: Request, res: Response): Promise
             return
         }
 
+        const slippageToleranceBips = req.body.slippageToleranceBips ?? 50
+
         const chainId = tokenIn.chainId
         const config = CHAIN_CONFIG[chainId as keyof typeof CHAIN_CONFIG]
 
@@ -87,7 +89,7 @@ export default async function quoteHandler(req: Request, res: Response): Promise
             tradeType === 'EXACT_OUTPUT' ? TradeType.EXACT_OUTPUT : TradeType.EXACT_INPUT,
             {
                 recipient,
-                slippageTolerance: new Percent(50, 10_000),
+                slippageTolerance: new Percent(slippageToleranceBips, 10_000),
                 type: SwapType.UNIVERSAL_ROUTER,
                 version: UniversalRouterVersion.V2_0,
             }
@@ -100,7 +102,18 @@ export default async function quoteHandler(req: Request, res: Response): Promise
 
         res.json({
             quote: route.quote.toExact(),
-            route: route.route.map((r) => r.tokenPath.map((t) => t.symbol)),
+            route: route.route.map((r) => ({
+                protocol: r.protocol,
+                percent: r.percent,
+                pools:
+                  'pools' in r.route
+                    ? (r.route as any).pools.map((pool: any) => ({
+                        token0: { symbol: pool.token0.symbol },
+                        token1: { symbol: pool.token1.symbol },
+                        fee: pool.fee,
+                      }))
+                    : []
+            })),
             estimatedGas: route.estimatedGasUsed.toString(),
             gasUsd: route.estimatedGasUsedUSD.toExact(),
             calldata: route.methodParameters.calldata,
