@@ -2,9 +2,9 @@ import type { Request, Response } from 'express'
 import { AlphaRouter, SwapType } from '@uniswap/smart-order-router'
 import { UniversalRouterVersion } from '@uniswap/universal-router-sdk'
 import { Token, CurrencyAmount, TradeType, Percent, Ether } from '@uniswap/sdk-core'
-import JSBI from 'jsbi'
 import { ethers } from 'ethers'
 import dotenv from 'dotenv'
+import { fromReadableAmount } from '../libs/conversion'
 dotenv.config()
 
 const CHAIN_CONFIG = {
@@ -48,7 +48,7 @@ export default async function quoteHandler(req: Request, res: Response): Promise
                 isNative?: boolean
             }
             amount: string
-            tradeType: 'EXACT_INPUT' | 'EXACT_OUTPUT'
+            tradeType: 0 | 1
             recipient: `0x${string}`
         } = req.body
 
@@ -78,15 +78,20 @@ export default async function quoteHandler(req: Request, res: Response): Promise
             ? Ether.onChain(chainId)
             : new Token(chainId, tokenOut.address, tokenOut.decimals, tokenOut.symbol, tokenOut.name)
 
+        const rawAmount = (() => {
+            const decimals = (tradeType == 1 ? outputToken : inputToken).decimals
+            return fromReadableAmount(Number(amount), decimals)
+        })()
+
         const amountTyped = CurrencyAmount.fromRawAmount(
-            tradeType === 'EXACT_OUTPUT' ? outputToken : inputToken,
-            JSBI.BigInt(amount)
+            tradeType == 1 ? outputToken : inputToken,
+            rawAmount
         )
 
         const route = await router.route(
             amountTyped,
-            tradeType === 'EXACT_OUTPUT' ? inputToken : outputToken,
-            tradeType === 'EXACT_OUTPUT' ? TradeType.EXACT_OUTPUT : TradeType.EXACT_INPUT,
+            tradeType == 1 ? inputToken : outputToken,
+            tradeType == 1 ? TradeType.EXACT_OUTPUT : TradeType.EXACT_INPUT,
             {
                 recipient,
                 slippageTolerance: new Percent(slippageToleranceBips, 10_000),
@@ -100,24 +105,28 @@ export default async function quoteHandler(req: Request, res: Response): Promise
             return
         }
 
+        const priceImpact = route.trade?.priceImpact?.toSignificant(4) ?? null;
+
+
         res.json({
             quote: route.quote.toExact(),
             route: route.route.map((r) => ({
                 protocol: r.protocol,
                 percent: r.percent,
                 pools:
-                  'pools' in r.route
-                    ? (r.route as any).pools.map((pool: any) => ({
-                        token0: { symbol: pool.token0.symbol },
-                        token1: { symbol: pool.token1.symbol },
-                        fee: pool.fee,
-                      }))
-                    : []
+                    'pools' in r.route
+                        ? (r.route as any).pools.map((pool: any) => ({
+                            token0: { symbol: pool.token0.symbol },
+                            token1: { symbol: pool.token1.symbol },
+                            fee: pool.fee,
+                        }))
+                        : []
             })),
-            estimatedGas: route.estimatedGasUsed.toString(),
+            // estimatedGas: route.estimatedGasUsed.toString(),
             gasUsd: route.estimatedGasUsedUSD.toExact(),
             calldata: route.methodParameters.calldata,
             value: route.methodParameters.value.toString(),
+            priceImpact,
         })
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error'
