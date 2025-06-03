@@ -16,7 +16,7 @@
   "dependencies": {
     "@uniswap/router-sdk": "^2.0.3",
     "@uniswap/sdk-core": "^7.7.2",
-    "@uniswap/smart-order-router": "^4.21.14",
+    "@uniswap/smart-order-router": "^4.21.18",
     "@uniswap/universal-router-sdk": "^4.19.5",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
