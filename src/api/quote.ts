@@ -31,6 +31,9 @@ const CHAIN_CONFIG = {
   8453: {
     rpcUrl: process.env.JSON_RPC_PROVIDER_BASE!,
   },
+  324: {
+    rpcUrl: process.env.JSON_RPC_PROVIDER_ZKSYNC!,
+  },
 };
 
 export default async function quoteHandler(
