@@ -71,9 +71,9 @@ export default async function quoteHandler(
       amount: string;
       tradeType: 0 | 1;
       recipient: `0x${string}`;
-      slippage: number;
+      slippage: string;
       protocols: string;
-      minSplits: number;
+      minSplits: string;
     } = req.body;
 
     if (!tokenIn || !tokenOut || !amount || !recipient) {
