@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import {
   AlphaRouter,
   AlphaRouterConfig,
+  nativeOnChain,
   SwapType,
 } from "@uniswap/smart-order-router";
 import { Protocol } from "@uniswap/router-sdk";
@@ -80,13 +81,14 @@ export default async function quoteHandler(
       return;
     }
 
-    const slippageBips = slippage ?? 50;
+    const slippageBips = !isNaN(Number(slippage)) ? Number(slippage) : 50;
     const routingConfig: Partial<AlphaRouterConfig> = {};
 
     if (protocols) {
       const protocolMap: Record<string, Protocol> = {
         V2: Protocol.V2,
         V3: Protocol.V3,
+        V4:Protocol.V4,
         MIXED: Protocol.MIXED,
       };
 
@@ -95,8 +97,9 @@ export default async function quoteHandler(
         .map((p) => protocolMap[p.trim()]);
     }
 
-    if (typeof minSplits === "number" && !isNaN(minSplits)) {
-      routingConfig.minSplits = minSplits;
+    const parsedMinSplits = Number(minSplits);
+    if (!isNaN(parsedMinSplits)) {
+      routingConfig.minSplits = parsedMinSplits;
     }
 
     const chainId = tokenIn.chainId;
@@ -111,7 +114,7 @@ export default async function quoteHandler(
     const router = new AlphaRouter({ chainId, provider });
 
     const inputToken = tokenIn.isNative
-      ? Ether.onChain(chainId)
+      ? nativeOnChain(chainId)
       : new Token(
           chainId,
           tokenIn.address,
@@ -121,7 +124,7 @@ export default async function quoteHandler(
         );
 
     const outputToken = tokenOut.isNative
-      ? Ether.onChain(chainId)
+      ? nativeOnChain(chainId)
       : new Token(
           chainId,
           tokenOut.address,
